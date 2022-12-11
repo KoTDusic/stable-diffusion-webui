@@ -18,6 +18,7 @@ from PIL import PngImagePlugin,Image
 from modules.sd_models import checkpoints_list
 from modules.realesrgan_model import get_realesrgan_models
 from typing import List
+from httpGeneratorServer import AddCustomRoutes
 
 def upscaler_to_index(name: str):
     try:
@@ -96,6 +97,7 @@ class Api:
         self.add_api_route("/sdapi/v1/prompt-styles", self.get_promp_styles, methods=["GET"], response_model=List[PromptStyleItem])
         self.add_api_route("/sdapi/v1/artist-categories", self.get_artists_categories, methods=["GET"], response_model=List[str])
         self.add_api_route("/sdapi/v1/artists", self.get_artists, methods=["GET"], response_model=List[ArtistItem])
+        AddCustomRoutes(app)
 
     def add_api_route(self, path: str, endpoint, **kwargs):
         if shared.cmd_opts.api_auth:

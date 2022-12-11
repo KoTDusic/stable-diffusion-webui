@@ -22,6 +22,7 @@ model_path = os.path.abspath(os.path.join(models_path, model_dir))
 
 CheckpointInfo = namedtuple("CheckpointInfo", ['filename', 'title', 'hash', 'model_name', 'config'])
 checkpoints_list = {}
+checkpoints_hashes = {}
 checkpoints_loaded = collections.OrderedDict()
 
 try:
@@ -87,6 +88,7 @@ def list_models():
             config = shared.cmd_opts.config
 
         checkpoints_list[title] = CheckpointInfo(filename, title, h, short_model_name, config)
+        checkpoints_hashes[short_model_name] = title
 
 
 def get_closet_checkpoint_match(searchString):

@@ -7,6 +7,7 @@ import shlex
 import platform
 import argparse
 import json
+import ctypes
 
 dir_repos = "repositories"
 dir_extensions = "extensions"
@@ -160,7 +161,6 @@ def run_extensions_installers(settings_file):
 def prepare_environment():
     torch_command = os.environ.get('TORCH_COMMAND', "pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 --extra-index-url https://download.pytorch.org/whl/cu113")
     requirements_file = os.environ.get('REQS_FILE', "requirements_versions.txt")
-    commandline_args = os.environ.get('COMMANDLINE_ARGS', "")
 
     gfpgan_package = os.environ.get('GFPGAN_PACKAGE', "git+https://github.com/TencentARC/GFPGAN.git@8d2447a2d918f8eba5a4a01463fd48e45126a379")
     clip_package = os.environ.get('CLIP_PACKAGE', "git+https://github.com/openai/CLIP.git@d50d76daa670286dd6cacf3bcd80b5e4823fc8e1")
@@ -179,8 +179,6 @@ def prepare_environment():
     k_diffusion_commit_hash = os.environ.get('K_DIFFUSION_COMMIT_HASH', "5b3af030dd83e0297272d861c19477735d0317ec")
     codeformer_commit_hash = os.environ.get('CODEFORMER_COMMIT_HASH', "c5b4593074ba6214284d6acd5f1719b6c5d739af")
     blip_commit_hash = os.environ.get('BLIP_COMMIT_HASH', "48211a1594f1321b00f14c9f7a5b4813144b2fb9")
-
-    sys.argv += shlex.split(commandline_args)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--ui-settings-file", type=str, help="filename to use for ui settings", default='config.json')
@@ -290,6 +288,26 @@ def start():
         webui.webui()
 
 
+def disable_console_selection():
+    kernel32 = ctypes.windll.kernel32
+    kernel32.SetConsoleMode(kernel32.GetStdHandle(-10), 128)
+
+
+def fix_duplicate_logs():
+    import logging
+    uvicorn_logger = logging.getLogger("uvicorn")
+    uvicorn_logger.propagate = False
+
+
+def parse_console_args():
+    commandline_args = os.environ.get('COMMANDLINE_ARGS', "")
+    sys.argv += shlex.split(commandline_args)
+
+
 if __name__ == "__main__":
-    prepare_environment()
+    disable_console_selection()
+    fix_duplicate_logs()
+    parse_console_args()
+    if '--skip-prepare' not in sys.argv:
+        prepare_environment()
     start()
