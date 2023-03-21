@@ -4,14 +4,13 @@ import base64
 from PIL import Image
 from modules import shared
 from modules.processing import process_images_inner
-from modules.sd_models import checkpoints_hashes
+from modules.sd_models import checkpoints_list, checkpoint_alisases
 from fastapi import Response, status, FastAPI
 from pydantic import BaseModel
 
 from modules.sd_vae import reload_vae_weights
 from webui import wrap_queued_call
 from modules.txt2img import StableDiffusionProcessingTxt2Img, StableDiffusionProcessingImg2Img
-from modules.hypernetworks.hypernetwork import load_hypernetwork, find_closest_hypernetwork_name
 from modules.sd_models import reload_model_weights
 from modules.sd_samplers import all_samplers_map
 
@@ -64,9 +63,7 @@ def txt2imgPatched(opt: Txt2imgParams):
         restore_faces=False,
         tiling=False,
         enable_hr=opt.hr_fix,
-        denoising_strength=0.7 if opt.hr_fix else None,
-        firstphase_width=0 if opt.hr_fix else None,
-        firstphase_height=0 if opt.hr_fix else None,
+        denoising_strength=0.7 if opt.hr_fix else None
     )
 
     processed = process_images_inner(p)
@@ -128,8 +125,8 @@ def get_sampler_index(sampler_name):
     return all_samplers_map[sampler_name] if sampler_name in all_samplers_map else all_samplers_map["DDIM"]
 
 
-def get_full_model_name(model_name: str) -> str:
-    return checkpoints_hashes[model_name] if model_name in checkpoints_hashes else checkpoints_hashes["mdjrny-v4"]
+def get_model_by_name(model_name: str):
+    return checkpoint_alisases[model_name] if model_name in checkpoint_alisases else checkpoint_alisases["mdjrny-v4"]
 
 
 def get_clip_stop_on_model(model_name: str) -> int:
@@ -137,18 +134,19 @@ def get_clip_stop_on_model(model_name: str) -> int:
 
 
 def reload_model(model_name: str):
-    new_model_name = get_full_model_name(model_name)
-    if new_model_name == shared.opts.sd_model_checkpoint:
+    new_model = get_model_by_name(model_name)
+    if new_model.title == shared.opts.sd_model_checkpoint:
         return
-    shared.opts.sd_model_checkpoint = new_model_name
+    shared.opts.sd_model_checkpoint = new_model.title
     shared.opts.CLIP_stop_at_last_layers = get_clip_stop_on_model(shared.opts.sd_model_checkpoint)
     print(f"set CLIP_stop = {shared.opts.CLIP_stop_at_last_layers}")
     reload_model_weights()
     reload_vae_weights()
 
 
-def reload_hypernetwork(hypernetwork_name: str):
-    load_hypernetwork(find_closest_hypernetwork_name(hypernetwork_name))
+def use_hypernetwork(params: Txt2imgParams):
+    if params.hypernetwork != 'none' and params.hypernetwork is not None:
+        params.text = f'{params.text} <hypernet:{params.hypernetwork}:1>'
 
 
 def from_img_to_base64(img):
@@ -161,7 +159,7 @@ def from_img_to_base64(img):
 def txt2imgApiLogic(params: Txt2imgParams, response: Response):
     global errors_count
     try:
-        reload_hypernetwork(params.hypernetwork)
+        use_hypernetwork(params)
         reload_model(params.model)
         result = txt2imgPatched(params)
         errors_count = 0
@@ -175,7 +173,7 @@ def txt2imgApiLogic(params: Txt2imgParams, response: Response):
 def img2imgApiLogic(params: Img2imgParams, response: Response):
     global errors_count
     try:
-        reload_hypernetwork(params.hypernetwork)
+        use_hypernetwork(params)
         reload_model(params.model)
         result = img2imgPatched(params)
         errors_count = 0
@@ -187,7 +185,7 @@ def img2imgApiLogic(params: Img2imgParams, response: Response):
 
 
 def available_models() -> list:
-    return list(checkpoints_hashes.keys())
+    return list(model.model_name for model in checkpoints_list.values())
 
 
 def errors_check() -> int:

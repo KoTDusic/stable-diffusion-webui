@@ -129,7 +129,6 @@ def list_models():
 
 
 def get_closet_checkpoint_match(search_string):
-    checkpoints_hashes[short_model_name] = title
     checkpoint_info = checkpoint_alisases.get(search_string, None)
     if checkpoint_info is not None:
         return checkpoint_info
