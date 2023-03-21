@@ -2,14 +2,17 @@ import os
 import sys
 import traceback
 
+import time
 import git
 
 from modules import paths, shared
 
 extensions = []
-extensions_dir = os.path.join(paths.script_path, "extensions")
+extensions_dir = os.path.join(paths.data_path, "extensions")
 extensions_builtin_dir = os.path.join(paths.script_path, "extensions-builtin")
 
+if not os.path.exists(extensions_dir):
+    os.makedirs(extensions_dir)
 
 def active():
     return [x for x in extensions if x.enabled]
@@ -23,6 +26,7 @@ class Extension:
         self.status = ''
         self.can_update = False
         self.is_builtin = is_builtin
+        self.version = ''
 
         repo = None
         try:
@@ -38,6 +42,10 @@ class Extension:
             try:
                 self.remote = next(repo.remote().urls, None)
                 self.status = 'unknown'
+                head = repo.head.commit
+                ts = time.asctime(time.gmtime(repo.head.commit.committed_date))
+                self.version = f'{head.hexsha[:8]} ({ts})'
+
             except Exception:
                 self.remote = None
 
@@ -58,7 +66,7 @@ class Extension:
 
     def check_updates(self):
         repo = git.Repo(self.path)
-        for fetch in repo.remote().fetch("--dry-run"):
+        for fetch in repo.remote().fetch(dry_run=True):
             if fetch.flags != fetch.HEAD_UPTODATE:
                 self.can_update = True
                 self.status = "behind"
@@ -71,8 +79,8 @@ class Extension:
         repo = git.Repo(self.path)
         # Fix: `error: Your local changes to the following files would be overwritten by merge`,
         # because WSL2 Docker set 755 file permissions instead of 644, this results to the error.
-        repo.git.fetch('--all')
-        repo.git.reset('--hard', 'origin')
+        repo.git.fetch(all=True)
+        repo.git.reset('origin', hard=True)
 
 
 def list_extensions():
