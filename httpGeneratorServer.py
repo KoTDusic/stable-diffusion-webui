@@ -219,5 +219,5 @@ def AddCustomRoutes(api_router: FastAPI):
     api_router.add_api_route("/img2img", img2imgApi, methods=["POST"])
     api_router.add_api_route("/errors_check", errors_check, methods=["GET"])
     api_router.add_api_route("/available_models", available_models, methods=["GET"])
-    # api_router.add_api_route("/available_items", available_items, methods=["GET"])
+    api_router.add_api_route("/available_items", available_items, methods=["GET"])
     api_router.add_api_route("/alife", alife_check, methods=["GET"])
