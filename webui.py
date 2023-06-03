@@ -6,6 +6,7 @@ import signal
 import re
 import warnings
 import json
+import importlib
 from threading import Thread
 
 from fastapi import FastAPI, Response
@@ -220,6 +221,8 @@ def initialize():
 
     extra_networks.initialize()
     extra_networks.register_extra_network(extra_networks_hypernet.ExtraNetworkHypernet())
+    extra_networks_lora = importlib.import_module("extensions-builtin.Lora.extra_networks_lora")
+    extra_networks.register_extra_network(extra_networks_lora.ExtraNetworkLora())
     startup_timer.record("extra networks")
 
     if cmd_opts.tls_keyfile is not None and cmd_opts.tls_keyfile is not None:

@@ -1,8 +1,9 @@
 import io
 import base64
-
+import importlib
 from PIL import Image
 from modules import shared
+from modules import sd_hijack
 from modules.processing import process_images_inner
 from modules.sd_models import checkpoints_list, checkpoint_alisases
 from fastapi import Response, status, FastAPI
@@ -13,6 +14,7 @@ from webui import wrap_queued_call
 from modules.processing import StableDiffusionProcessingTxt2Img, StableDiffusionProcessingImg2Img
 from modules.sd_models import reload_model_weights
 from modules.sd_samplers import all_samplers_map
+loras = importlib.import_module("extensions-builtin.Lora.lora").available_loras
 
 
 class Txt2imgParams(BaseModel):
@@ -188,6 +190,13 @@ def available_models() -> list:
     return list(model.model_name for model in checkpoints_list.values())
 
 
+def available_items() -> dict:
+    return {"models": list(model.model_name for model in checkpoints_list.values()),
+            "loras": list(loras.keys()),
+            "embeddings": list(sd_hijack.model_hijack.embedding_db.word_embeddings.keys()),
+            "hypernetworks": list(shared.hypernetworks.keys())}
+
+
 def errors_check() -> int:
     return errors_count
 
@@ -210,4 +219,5 @@ def AddCustomRoutes(api_router: FastAPI):
     api_router.add_api_route("/img2img", img2imgApi, methods=["POST"])
     api_router.add_api_route("/errors_check", errors_check, methods=["GET"])
     api_router.add_api_route("/available_models", available_models, methods=["GET"])
+    # api_router.add_api_route("/available_items", available_items, methods=["GET"])
     api_router.add_api_route("/alife", alife_check, methods=["GET"])
