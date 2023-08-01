@@ -61,18 +61,12 @@ function extract_image_from_gallery(gallery) {
     return [gallery[index]];
 }
 
-function args_to_array(args) {
-    var res = [];
-    for (var i = 0; i < args.length; i++) {
-        res.push(args[i]);
-    }
-    return res;
-}
+window.args_to_array = Array.from; // Compatibility with e.g. extensions that may expect this to be around
 
 function switch_to_txt2img() {
     gradioApp().querySelector('#tabs').querySelectorAll('button')[0].click();
 
-    return args_to_array(arguments);
+    return Array.from(arguments);
 }
 
 function switch_to_img2img_tab(no) {
@@ -81,65 +75,55 @@ function switch_to_img2img_tab(no) {
 }
 function switch_to_img2img() {
     switch_to_img2img_tab(0);
-    return args_to_array(arguments);
+    return Array.from(arguments);
 }
 
 function switch_to_sketch() {
     switch_to_img2img_tab(1);
-    return args_to_array(arguments);
+    return Array.from(arguments);
 }
 
 function switch_to_inpaint() {
     switch_to_img2img_tab(2);
-    return args_to_array(arguments);
+    return Array.from(arguments);
 }
 
 function switch_to_inpaint_sketch() {
     switch_to_img2img_tab(3);
-    return args_to_array(arguments);
+    return Array.from(arguments);
 }
 
 function switch_to_extras() {
     gradioApp().querySelector('#tabs').querySelectorAll('button')[2].click();
 
-    return args_to_array(arguments);
+    return Array.from(arguments);
 }
 
 function get_tab_index(tabId) {
-    var res = 0;
-
-    gradioApp().getElementById(tabId).querySelector('div').querySelectorAll('button').forEach(function(button, i) {
-        if (button.className.indexOf('selected') != -1) {
-            res = i;
+    let buttons = gradioApp().getElementById(tabId).querySelector('div').querySelectorAll('button');
+    for (let i = 0; i < buttons.length; i++) {
+        if (buttons[i].classList.contains('selected')) {
+            return i;
         }
-    });
-
-    return res;
+    }
+    return 0;
 }
 
 function create_tab_index_args(tabId, args) {
-    var res = [];
-    for (var i = 0; i < args.length; i++) {
-        res.push(args[i]);
-    }
-
+    var res = Array.from(args);
     res[0] = get_tab_index(tabId);
-
     return res;
 }
 
 function get_img2img_tab_index() {
-    let res = args_to_array(arguments);
+    let res = Array.from(arguments);
     res.splice(-2);
     res[0] = get_tab_index('mode_img2img');
     return res;
 }
 
 function create_submit_args(args) {
-    var res = [];
-    for (var i = 0; i < args.length; i++) {
-        res.push(args[i]);
-    }
+    var res = Array.from(args);
 
     // As it is currently, txt2img and img2img send back the previous output args (txt2img_gallery, generation_info, html_info) whenever you generate a new image.
     // This can lead to uploading a huge gallery of previously generated images, which leads to an unnecessary delay between submitting and beginning to generate.
@@ -168,7 +152,11 @@ function submit() {
     showSubmitButtons('txt2img', false);
 
     var id = randomId();
-    localStorage.setItem("txt2img_task_id", id);
+    try {
+        localStorage.setItem("txt2img_task_id", id);
+    } catch (e) {
+        console.warn(`Failed to save txt2img task id to localStorage: ${e}`);
+    }
 
     requestProgress(id, gradioApp().getElementById('txt2img_gallery_container'), gradioApp().getElementById('txt2img_gallery'), function() {
         showSubmitButtons('txt2img', true);
@@ -187,7 +175,11 @@ function submit_img2img() {
     showSubmitButtons('img2img', false);
 
     var id = randomId();
-    localStorage.setItem("img2img_task_id", id);
+    try {
+        localStorage.setItem("img2img_task_id", id);
+    } catch (e) {
+        console.warn(`Failed to save img2img task id to localStorage: ${e}`);
+    }
 
     requestProgress(id, gradioApp().getElementById('img2img_gallery_container'), gradioApp().getElementById('img2img_gallery'), function() {
         showSubmitButtons('img2img', true);
@@ -206,8 +198,6 @@ function submit_img2img() {
 function restoreProgressTxt2img() {
     showRestoreProgressButton("txt2img", false);
     var id = localStorage.getItem("txt2img_task_id");
-
-    id = localStorage.getItem("txt2img_task_id");
 
     if (id) {
         requestProgress(id, gradioApp().getElementById('txt2img_gallery_container'), gradioApp().getElementById('txt2img_gallery'), function() {
@@ -264,29 +254,8 @@ function confirm_clear_prompt(prompt, negative_prompt) {
 }
 
 
-var promptTokecountUpdateFuncs = {};
-
-function recalculatePromptTokens(name) {
-    if (promptTokecountUpdateFuncs[name]) {
-        promptTokecountUpdateFuncs[name]();
-    }
-}
-
-function recalculate_prompts_txt2img() {
-    recalculatePromptTokens('txt2img_prompt');
-    recalculatePromptTokens('txt2img_neg_prompt');
-    return args_to_array(arguments);
-}
-
-function recalculate_prompts_img2img() {
-    recalculatePromptTokens('img2img_prompt');
-    recalculatePromptTokens('img2img_neg_prompt');
-    return args_to_array(arguments);
-}
-
-
 var opts = {};
-onUiUpdate(function() {
+onAfterUiUpdate(function() {
     if (Object.keys(opts).length != 0) return;
 
     var json_elem = gradioApp().getElementById('settings_json');
@@ -318,28 +287,7 @@ onUiUpdate(function() {
 
     json_elem.parentElement.style.display = "none";
 
-    function registerTextarea(id, id_counter, id_button) {
-        var prompt = gradioApp().getElementById(id);
-        var counter = gradioApp().getElementById(id_counter);
-        var textarea = gradioApp().querySelector("#" + id + " > label > textarea");
-
-        if (counter.parentElement == prompt.parentElement) {
-            return;
-        }
-
-        prompt.parentElement.insertBefore(counter, prompt);
-        prompt.parentElement.style.position = "relative";
-
-        promptTokecountUpdateFuncs[id] = function() {
-            update_token_counter(id_button);
-        };
-        textarea.addEventListener("input", promptTokecountUpdateFuncs[id]);
-    }
-
-    registerTextarea('txt2img_prompt', 'txt2img_token_counter', 'txt2img_token_button');
-    registerTextarea('txt2img_neg_prompt', 'txt2img_negative_token_counter', 'txt2img_negative_token_button');
-    registerTextarea('img2img_prompt', 'img2img_token_counter', 'img2img_token_button');
-    registerTextarea('img2img_neg_prompt', 'img2img_negative_token_counter', 'img2img_negative_token_button');
+    setupTokenCounters();
 
     var show_all_pages = gradioApp().getElementById('settings_show_all_pages');
     var settings_tabs = gradioApp().querySelector('#settings div');
@@ -370,33 +318,6 @@ onOptionsChanged(function() {
 });
 
 let txt2img_textarea, img2img_textarea = undefined;
-let wait_time = 800;
-let token_timeouts = {};
-
-function update_txt2img_tokens(...args) {
-    update_token_counter("txt2img_token_button");
-    if (args.length == 2) {
-        return args[0];
-    }
-    return args;
-}
-
-function update_img2img_tokens(...args) {
-    update_token_counter(
-        "img2img_token_button"
-    );
-    if (args.length == 2) {
-        return args[0];
-    }
-    return args;
-}
-
-function update_token_counter(button_id) {
-    if (token_timeouts[button_id]) {
-        clearTimeout(token_timeouts[button_id]);
-    }
-    token_timeouts[button_id] = setTimeout(() => gradioApp().getElementById(button_id)?.click(), wait_time);
-}
 
 function restart_reload() {
     document.body.innerHTML = '<h1 style="font-family:monospace;margin-top:20%;color:lightgray;text-align:center;">Reloading...</h1>';

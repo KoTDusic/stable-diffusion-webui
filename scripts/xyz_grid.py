@@ -3,6 +3,7 @@ from copy import copy
 from itertools import permutations, chain
 import random
 import csv
+import os.path
 from io import StringIO
 from PIL import Image
 import numpy as np
@@ -10,7 +11,7 @@ import numpy as np
 import modules.scripts as scripts
 import gradio as gr
 
-from modules import images, sd_samplers, processing, sd_models, sd_vae
+from modules import images, sd_samplers, processing, sd_models, sd_vae, sd_samplers_kdiffusion, errors
 from modules.processing import process_images, Processed, StableDiffusionProcessingTxt2Img
 from modules.shared import opts, state
 import modules.shared as shared
@@ -144,10 +145,19 @@ def apply_face_restore(p, opt, x):
     p.restore_faces = is_active
 
 
-def apply_override(field):
+def apply_override(field, boolean: bool = False):
     def fun(p, x, xs):
+        if boolean:
+            x = True if x.lower() == "true" else False
         p.override_settings[field] = x
     return fun
+
+
+def boolean_choice(reverse: bool = False):
+    def choice():
+        return ["False", "True"] if reverse else ["True", "False"]
+    return choice
+
 
 def format_value_add_label(p, opt, x):
     if type(x) == float:
@@ -173,6 +183,8 @@ def do_nothing(p, x, xs):
 def format_nothing(p, opt, x):
     return ""
 
+def format_remove_path(p, opt, x):
+    return os.path.basename(x)
 
 def str_permutations(x):
     """dummy function for specifying it in AxisOption's type when you want to get a list of permutations"""
@@ -214,12 +226,16 @@ axis_options = [
     AxisOption("Prompt order", str_permutations, apply_order, format_value=format_value_join_list),
     AxisOptionTxt2Img("Sampler", str, apply_sampler, format_value=format_value, confirm=confirm_samplers, choices=lambda: [x.name for x in sd_samplers.samplers]),
     AxisOptionImg2Img("Sampler", str, apply_sampler, format_value=format_value, confirm=confirm_samplers, choices=lambda: [x.name for x in sd_samplers.samplers_for_img2img]),
-    AxisOption("Checkpoint name", str, apply_checkpoint, format_value=format_value, confirm=confirm_checkpoints, cost=1.0, choices=lambda: sorted(sd_models.checkpoints_list, key=str.casefold)),
+    AxisOption("Checkpoint name", str, apply_checkpoint, format_value=format_remove_path, confirm=confirm_checkpoints, cost=1.0, choices=lambda: sorted(sd_models.checkpoints_list, key=str.casefold)),
     AxisOption("Negative Guidance minimum sigma", float, apply_field("s_min_uncond")),
     AxisOption("Sigma Churn", float, apply_field("s_churn")),
     AxisOption("Sigma min", float, apply_field("s_tmin")),
     AxisOption("Sigma max", float, apply_field("s_tmax")),
     AxisOption("Sigma noise", float, apply_field("s_noise")),
+    AxisOption("Schedule type", str, apply_override("k_sched_type"), choices=lambda: list(sd_samplers_kdiffusion.k_diffusion_scheduler)),
+    AxisOption("Schedule min sigma", float, apply_override("sigma_min")),
+    AxisOption("Schedule max sigma", float, apply_override("sigma_max")),
+    AxisOption("Schedule rho", float, apply_override("rho")),
     AxisOption("Eta", float, apply_field("eta")),
     AxisOption("Clip skip", int, apply_clip_skip),
     AxisOption("Denoising", float, apply_field("denoising_strength")),
@@ -231,6 +247,7 @@ axis_options = [
     AxisOption("Face restore", str, apply_face_restore, format_value=format_value),
     AxisOption("Token merging ratio", float, apply_override('token_merging_ratio')),
     AxisOption("Token merging ratio high-res", float, apply_override('token_merging_ratio_hr')),
+    AxisOption("Always discard next-to-last sigma", str, apply_override('always_discard_next_to_last_sigma', boolean=True), choices=boolean_choice(reverse=True)),
 ]
 
 
@@ -634,7 +651,12 @@ class Script(scripts.Script):
             y_opt.apply(pc, y, ys)
             z_opt.apply(pc, z, zs)
 
-            res = process_images(pc)
+            try:
+                res = process_images(pc)
+            except Exception as e:
+                errors.display(e, "generating image for xyz plot")
+
+                res = Processed(p, [], p.seed, "")
 
             # Sets subgrid infotexts
             subgrid_index = 1 + iz
