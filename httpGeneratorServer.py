@@ -10,7 +10,7 @@ from fastapi import Response, status, FastAPI
 from pydantic import BaseModel
 
 from modules.sd_vae import reload_vae_weights
-from webui import wrap_queued_call
+from modules.call_queue import wrap_queued_call
 from modules.processing import StableDiffusionProcessingTxt2Img, StableDiffusionProcessingImg2Img
 from modules.sd_models import reload_model_weights
 from modules.sd_samplers import all_samplers_map
